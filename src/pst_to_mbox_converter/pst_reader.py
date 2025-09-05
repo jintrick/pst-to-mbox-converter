@@ -20,33 +20,12 @@ class PSTReader:
         logging.info("Starting to extract messages from the PST file.")
         message_count = 0
         for folder, message in self._folder_iterator(self.root_folder):
-            # The message object from pypff has headers and body.
-            # We need to construct a full RFC 822 message.
-            # Transport headers should contain the 'From ' line for mbox format.
-            headers = message.transport_headers
-            body = message.plain_text_body
-
-            if headers and body:
-                # The 'From ' line is critical for MBOX format.
-                # pypff does not seem to provide a direct way to get the 'From ' line.
-                # We will construct a minimal one.
-                # The MboxWriter will handle the final 'From ' line.
-                # For now, we will just pass the raw message content.
-                # The mailbox module expects bytes.
-
-                # Let's check what we have in the message object.
-                # I'll assume for now that the message object has a get_rfc822_representation() method
-                # or something similar. If not, I'll have to construct it manually.
-                # A quick search on libpff documentation would be useful here.
-                # Let's assume the message object itself can be converted to bytes.
-                # A common pattern is to have a read_buffer method.
-
-                message_bytes = self._get_message_as_bytes(message)
-                if message_bytes:
-                    yield message_bytes
-                    message_count += 1
-                    if message_count % 100 == 0:
-                        logging.info(f"Extracted {message_count} messages so far...")
+            message_bytes = self._get_message_as_bytes(message)
+            if message_bytes:
+                yield message_bytes
+                message_count += 1
+                if message_count % 100 == 0:
+                    logging.info(f"Extracted {message_count} messages so far...")
 
         logging.info(f"Finished extracting. Total messages found: {message_count}")
 
@@ -65,32 +44,39 @@ class PSTReader:
         Reads the full message content using the correct pypff methods
         and returns it as a byte string.
         """
-        # The review pointed out the correct way to get the message bytes.
-        # I should use get_transport_headers_as_bytes() and get_body_as_bytes().
         try:
-            headers = message.get_transport_headers_as_bytes()
-            body_size = message.get_body_size()
-            body = message.read_buffer(body_size) if body_size > 0 else b""
+            headers = message.get_transport_headers()
+            body = message.get_plain_text_body()
 
             if not headers:
-                logging.warning(f"Message with subject '{message.subject}' has no transport headers. Skipping.")
-                return None
+                logging.warning(f"Message with subject '{message.subject}' has no transport headers. Constructing a minimal header.")
+                subject = message.subject or "(No Subject)"
+                headers = f"Subject: {subject}\r\n"
 
-            # The transport headers should already be in RFC 822 format.
-            # We just need to combine them with the body.
-            # The headers should end with a double newline.
-            if not headers.endswith(b"\r\n\r\n"):
-                if headers.endswith(b"\n\n"):
-                    headers = headers.strip() + b"\r\n\r\n"
-                else:
-                    headers = headers.strip() + b"\r\n\r\n"
+            if isinstance(headers, str):
+                headers_bytes = headers.encode("utf-8", errors="replace")
+            else:
+                headers_bytes = headers if headers else b""
 
-            return headers + body
+            if isinstance(body, str):
+                body_bytes = body.encode("utf-8", errors="replace")
+            else:
+                body_bytes = body if body else b""
+
+            if not headers_bytes.endswith(b"\r\n\r\n"):
+                headers_bytes = headers_bytes.strip() + b"\r\n\r\n"
+
+            return headers_bytes + body_bytes
 
         except Exception as e:
             logging.error(f"Error reading message bytes for subject '{message.subject}': {e}")
             return None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def close(self):
         self.pst_file.close()
