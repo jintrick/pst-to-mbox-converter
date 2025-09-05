@@ -72,6 +72,12 @@ class PSTReader:
             logging.error(f"Error reading message bytes for subject '{message.subject}': {e}")
             return None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def close(self):
         self.pst_file.close()
         logging.info("PST file closed.")

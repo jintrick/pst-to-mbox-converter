@@ -40,6 +40,12 @@ class MboxWriter:
             # Log the error but continue, so one bad message doesn't stop the whole process.
             logging.error(f"Failed to parse and add message to MBOX: {e}")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def close(self):
         """
         Closes the MBOX file to ensure all data is written to disk.

@@ -13,17 +13,15 @@ VALID_MESSAGE_BYTES = b"From MAILER-DAEMON Fri Jul  8 12:08:34 2022\nSubject: Te
 
 def test_pst_reader_opens_file():
     """Tests that PSTReader can successfully open a PST file."""
-    try:
-        reader = PSTReader(SAMPLE_PST_PATH)
-        reader.close()
-    except Exception as e:
-        pytest.fail(f"PSTReader failed to open the PST file: {e}")
+    # The 'with' statement ensures the file is closed even if assertions fail
+    with PSTReader(SAMPLE_PST_PATH) as reader:
+        assert reader.pst_file is not None
+        assert reader.root_folder is not None
 
 def test_pst_reader_get_messages_yields_bytes():
     """Tests that get_messages yields non-empty bytes."""
-    reader = PSTReader(SAMPLE_PST_PATH)
-    messages = list(reader.get_messages())
-    reader.close()
+    with PSTReader(SAMPLE_PST_PATH) as reader:
+        messages = list(reader.get_messages())
 
     assert len(messages) > 0, "No messages were extracted from the PST file."
     for msg in messages:
@@ -33,37 +31,33 @@ def test_pst_reader_get_messages_yields_bytes():
 def test_mbox_writer_adds_message(tmp_path):
     """Tests that MboxWriter can add a message to an MBOX file."""
     mbox_file = tmp_path / "test.mbox"
-    writer = MboxWriter(str(mbox_file))
-    writer.add_message(VALID_MESSAGE_BYTES)
-    writer.close()
+    with MboxWriter(str(mbox_file)) as writer:
+        writer.add_message(VALID_MESSAGE_BYTES)
 
     assert os.path.exists(mbox_file)
-    with open(mbox_file, "r") as f:
-        content = f.read()
-        assert "Subject: Test" in content
+    mbox = mailbox.mbox(mbox_file)
+    assert len(mbox) == 1
+    assert "Subject: Test" in mbox[0].as_string()
 
 def test_mbox_writer_handles_none_message(tmp_path, caplog):
     """Tests that MboxWriter logs a warning for None messages."""
     mbox_file = tmp_path / "test.mbox"
-    writer = MboxWriter(str(mbox_file))
-    writer.add_message(None)
-    writer.close()
+    with MboxWriter(str(mbox_file)) as writer:
+        writer.add_message(None)
 
     assert "Attempted to add an empty message. Skipping." in caplog.text
     assert any(record.levelno == 30 for record in caplog.records) # 30 is WARNING
 
 def test_mbox_writer_handles_corrupted_message(tmp_path, caplog, monkeypatch):
     """Tests that MboxWriter logs an error for corrupted messages."""
-
     def mock_message_from_bytes(b, *, policy=None):
         raise ValueError("Simulated parsing error")
 
     monkeypatch.setattr("pst_to_mbox_converter.mbox_writer.message_from_bytes", mock_message_from_bytes)
 
     mbox_file = tmp_path / "test.mbox"
-    writer = MboxWriter(str(mbox_file))
-    writer.add_message(b"any bytes will now cause an error")
-    writer.close()
+    with MboxWriter(str(mbox_file)) as writer:
+        writer.add_message(b"any bytes will now cause an error")
 
     assert "Failed to parse and add message to MBOX" in caplog.text
     assert "Simulated parsing error" in caplog.text
@@ -94,5 +88,9 @@ def test_end_to_end_conversion(tmp_path, monkeypatch):
     assert output_mbox.stat().st_size > 0
 
     # For a more thorough check, we can use the mailbox library to count messages
+    # We should also know how many messages are in the sample.pst to make a precise assertion.
+    # Let's assume sample.pst contains 1 messages for this example.
+    # You should adjust this number to the actual count in your sample.pst.
+    expected_message_count = 1 # <-- ADJUST THIS
     mbox = mailbox.mbox(output_mbox)
-    assert len(mbox) > 0
+    assert len(mbox) == expected_message_count, f"Expected {expected_message_count} messages, but found {len(mbox)}"
