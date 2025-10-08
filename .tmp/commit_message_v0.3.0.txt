@@ -1,0 +1,9 @@
+feat: libpff の ctypes 直接バインディングを実装
+
+サードパーティのPythonラッパーへの依存を排除し、`ctypes` を用いて `libpff` を直接バインディングするように `pst_reader.py` を再実装しました。
+
+- `pyproject.toml` から `pypff-wheels` などのPST関連ライブラリの依存を削除。
+- `src/pst_to_mbox_converter/pst_reader.py` を `ctypes` を使用して全面的に書き換え。
+- `libpff` の関数シグネチャを定義し、`PSTReader` クラスのメソッドを再設計。
+
+これにより、Pythonのバージョンアップによるビルドエラーのリスクを低減し、安定した動作を確保します。

@@ -1,8 +1,7 @@
 import pytest
 import os
 import mailbox
-import sys
-import email
+
 from pst_to_mbox_converter.pst_reader import PSTReader
 from pst_to_mbox_converter.mbox_writer import MboxWriter
 from pst_to_mbox_converter import main as main_module

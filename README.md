@@ -19,9 +19,15 @@ A simple and efficient command-line tool for converting Microsoft Outlook PST fi
     pip install .
     ```
 
+    これにより、`pst-converter` コマンドがシステムにインストールされます。
+
+    **注意:** このツールは `libpff` という外部ライブラリに依存しています。
+    `libpff` がシステムにインストールされているか、またはアプリケーションに同梱されている必要があります。
+    詳細については、`src/pst_to_mbox_converter/pst_reader.py` を参照してください。
+
 ## Usage
 
-After installation, you can use the `pst-converter` command in your terminal.
+インストール後、`pst-converter` コマンドをターミナルで使用できます。
 
 ### Syntax
 
